@@ -1,0 +1,303 @@
+import java.awt.*;
+import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import javax.swing.*;
+
+public class ATMSystem extends JFrame {
+    String bank = " BANK";
+    int atmCash = 100000;
+    int attempts = 0;
+    Card currentCard;
+    Account currentAccount;
+    HashMap<String, Card> cards = new HashMap<>();
+    class Account {
+        int balance;
+        ArrayList<String> history = new ArrayList<>();
+        Account(int balance) {
+            this.balance = balance;
+        }
+        void record(String type, int amount) {
+            history.add(new Date() + " | " + type + " | Rs." + amount 
+        + " | Balance: Rs." + balance);
+        }
+    }
+    class Card {
+        String number;
+        String pinHash;
+        boolean active;
+        HashMap<String, Account> accounts = new HashMap<>();
+        Card(String number, String pin, boolean active) {
+            this.number = number;
+            this.pinHash = hashPIN(number, pin);
+            this.active = active;
+        }
+    }
+    String hashPIN(String number, String pin) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest((number + ":" + pin).getBytes("UTF-8"));
+            StringBuilder result = new StringBuilder();
+            for (byte b : hash) {
+                result.append(String.format("%02x", b));
+            }
+            return result.toString();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+    void createAccounts() {
+        Card c1 = new Card("1111222233334444", "1111", true);
+        c1.accounts.put("Savings", new Account(25000));
+        c1.accounts.put("Current", new Account(50000));
+        Card c2 = new Card("5555666677778888", "4321", true);
+        c2.accounts.put("Savings", new Account(8000));
+        Card c3 = new Card("9999000011112222", "0000", false);
+        c3.accounts.put("Savings", new Account(1000));
+        cards.put(c1.number, c1);
+        cards.put(c2.number, c2);
+        cards.put(c3.number, c3);
+    }
+    ATMSystem() {
+        createAccounts();
+        setTitle(" BANK ATM");
+        setSize(450, 400);
+        setLocationRelativeTo(null);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        showLogin();
+        setVisible(true);
+    }
+    JLabel heading(String text) {
+        JLabel label = new JLabel(text, JLabel.CENTER);
+        label.setFont(new Font("Arial", Font.BOLD, 22));
+        return label;
+    }
+    JButton createButton(String text) {
+        JButton button = new JButton(text);
+        button.setPreferredSize(new java.awt.Dimension(160, 35));
+        button.setFont(new Font("Arial", Font.PLAIN, 13));
+        return button;
+    }
+    void showLogin() {
+        JPanel mainPanel = new JPanel(new BorderLayout(10, 15));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 40, 20, 40));
+        mainPanel.add(this.heading(this.bank), BorderLayout.NORTH);
+        JPanel centerPanel = new JPanel(new GridLayout(2, 1, 10, 10));
+        JLabel welcome = new JLabel("Welcome! Please insert your card.", JLabel.CENTER);
+        JTextField cardField = new JTextField();
+        cardField.setBorder(BorderFactory.createTitledBorder("Card Number"));
+        centerPanel.add(welcome);
+        centerPanel.add(cardField);
+        JButton insertButton = createButton("Insert Card");
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        buttonPanel.add(insertButton);
+        mainPanel.add(centerPanel, BorderLayout.CENTER);
+        mainPanel.add(buttonPanel, BorderLayout.SOUTH);
+        insertButton.addActionListener(e -> {
+            String cardNumber = cardField.getText().trim();
+            this.currentCard = this.cards.get(cardNumber);
+            if (this.currentCard == null) {
+                JOptionPane.showMessageDialog(this, "Card not recognised.");
+            } else if (!this.currentCard.active) {
+                JOptionPane.showMessageDialog(this,
+                    "Card is blocked. Contact your bank.");
+                this.currentCard = null;
+            } else {
+                this.attempts = 0;
+                this.showPIN();
+            }
+        });
+        this.setContentPane(mainPanel);
+        this.revalidate();
+        this.repaint();
+    }
+    void showPIN() {
+        JPanel mainPanel = new JPanel(new BorderLayout(10, 20));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(30, 50, 30, 50));
+        mainPanel.add(this.heading("Enter Your PIN"), BorderLayout.NORTH);
+        JPasswordField pinField = new JPasswordField();
+        pinField.setBorder(BorderFactory.createTitledBorder("PIN"));
+        pinField.setHorizontalAlignment(JTextField.CENTER);
+        JPanel centerPanel = new JPanel(new GridLayout(1, 1));
+        centerPanel.add(pinField);
+        JButton loginButton = createButton("Login");
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        buttonPanel.add(loginButton);
+        mainPanel.add(centerPanel, BorderLayout.CENTER);
+        mainPanel.add(buttonPanel, BorderLayout.SOUTH);
+        loginButton.addActionListener(e -> {
+            String pin = new String(pinField.getPassword());
+            if (this.hashPIN(this.currentCard.number, pin)
+                    .equals(this.currentCard.pinHash)) {
+                JOptionPane.showMessageDialog(this,"PIN Verified Successfully!");
+                this.showAccounts();
+            } else {
+                ++this.attempts;
+                if (this.attempts == 3) {
+                    this.currentCard.active = false;
+                    JOptionPane.showMessageDialog(this,"Wrong PIN 3 times. Card blocked.");
+                    this.currentCard = null;
+                    this.showLogin();
+                } else {
+                    JOptionPane.showMessageDialog(this,"Incorrect PIN. Attempts left: " + (3 - this.attempts));
+                }
+            }
+        });
+        this.setContentPane(mainPanel);
+        this.revalidate();
+        this.repaint();
+    }    
+    void showAccounts() {
+        JPanel mainPanel = new JPanel(new BorderLayout(10, 20));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(30, 50, 30, 50));
+        mainPanel.add(this.heading("Select Account"), BorderLayout.NORTH);
+        JButton savingsButton = createButton("Savings Account");
+        JButton currentButton = createButton("Current Account");
+        JButton cancelButton = createButton("Cancel");
+        JPanel buttonPanel = new JPanel(new GridLayout(3, 1, 10, 10));
+        buttonPanel.add(savingsButton);
+        buttonPanel.add(currentButton);
+        buttonPanel.add(cancelButton);
+        mainPanel.add(buttonPanel, BorderLayout.CENTER);
+        savingsButton.addActionListener(e -> this.selectAccount("Savings"));
+        currentButton.addActionListener(e -> this.selectAccount("Current"));
+        cancelButton.addActionListener(e -> this.ejectCard());
+        this.setContentPane(mainPanel);
+        this.revalidate();
+        this.repaint();
+    }
+    void selectAccount(String type) {
+        if (!currentCard.accounts.containsKey(type)) {
+            JOptionPane.showMessageDialog(this,"Account not linked to this card.");
+        }
+        else {
+            currentAccount = currentCard.accounts.get(type);
+            showMenu();
+        }
+    }
+    void showMenu() {
+        JPanel mainPanel = new JPanel(new GridLayout(6, 1, 10, 10));
+        mainPanel.add(this.heading("ATM MAIN MENU"));
+        JButton balance = createButton("Balance Enquiry");
+        JButton withdraw = createButton("Withdraw");
+        JButton deposit = createButton("Deposit");
+        JButton statement = createButton("Mini Statement");
+        JButton exit = createButton("Exit");
+        JPanel buttonPanel = new JPanel(new GridLayout(5, 1, 5, 5));
+        buttonPanel.add(balance);
+        buttonPanel.add(withdraw);
+        buttonPanel.add(deposit);
+        buttonPanel.add(statement);
+        buttonPanel.add(exit);
+        mainPanel.removeAll();
+        JPanel centerPanel = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 10, 5));
+        centerPanel.add(buttonPanel);
+        mainPanel.setLayout(new BorderLayout());
+        mainPanel.add(this.heading("ATM MAIN MENU"), BorderLayout.NORTH);
+        mainPanel.add(centerPanel, BorderLayout.CENTER);
+        balance.addActionListener(e -> {
+            JOptionPane.showMessageDialog(this,"Available Balance: Rs." + this.currentAccount.balance);
+            this.receipt("BALANCE ENQUIRY", 0);
+        });
+        withdraw.addActionListener(e -> this.withdrawMoney());
+        deposit.addActionListener(e -> this.depositMoney());
+        statement.addActionListener(e -> this.showStatement());
+        exit.addActionListener(e -> this.ejectCard());
+        this.setContentPane(mainPanel);
+        this.revalidate();
+        this.repaint();
+    }
+    void withdrawMoney() {
+        String input = JOptionPane.showInputDialog(this,"Enter withdrawal amount:");
+        if (input == null) return;
+        try {
+            int amount = Integer.parseInt(input);
+            if (amount <= 0)
+                throw new Exception("Enter a valid amount.");
+            if (amount % 100 != 0)
+                throw new Exception("Amount must be multiple of Rs.100.");
+            if (amount > 20000)
+                throw new Exception("Maximum limit is Rs.20000.");
+            if (amount > currentAccount.balance)
+                throw new Exception("Insufficient balance.");
+            if (amount > atmCash)
+                throw new Exception("ATM has insufficient cash.");
+            currentAccount.balance -= amount;
+            atmCash -= amount;
+            currentAccount.record("WITHDRAWAL", amount);
+            JOptionPane.showMessageDialog(this,"Please collect your cash: Rs." + amount + "\nTransaction Successful!");
+            receipt("WITHDRAWAL", amount);
+        }
+        catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this,"Enter digits only.");
+        }
+        catch (Exception e) {
+            JOptionPane.showMessageDialog(this,e.getMessage());
+        }
+    }
+    void depositMoney() {
+        String input = JOptionPane.showInputDialog(this,"Enter deposit amount:");
+        if (input == null) return;
+        try {
+            int amount = Integer.parseInt(input);
+            if (amount <= 0)
+                throw new Exception("Enter a valid amount.");
+            currentAccount.balance += amount;
+            atmCash += amount;
+            currentAccount.record("DEPOSIT", amount);
+            JOptionPane.showMessageDialog(this,"Deposit Successful!");
+            receipt("DEPOSIT", amount);
+        }
+        catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this,"Enter digits only.");
+        }
+        catch (Exception e) {
+            JOptionPane.showMessageDialog(this,e.getMessage());
+        }
+    }
+    void showStatement() {
+        String statement = "MINI STATEMENT\n\n";
+        int start = Math.max(0,currentAccount.history.size() - 5);
+        for (int i = start;i < currentAccount.history.size(); i++) {
+            statement += currentAccount.history.get(i) + "\n\n";
+        }
+        if (currentAccount.history.isEmpty()) {
+            statement += "No transactions found.";
+        }
+        JOptionPane.showMessageDialog(this, statement);
+    }
+    void receipt(String type, int amount) {
+        int choice = JOptionPane.showConfirmDialog(this,"Do you want a receipt?","Receipt",JOptionPane.YES_NO_OPTION);
+        if (choice == JOptionPane.YES_OPTION) {
+            String card = "XXXX-XXXX-XXXX-" + currentCard.number.substring(12);
+            String text = "---- " + bank + " ----\n"
+                    + "Date: " + new Date() + "\n"
+                    + "Card: " + card + "\n"
+                    + "Account: " + getAccountName() + "\n"
+                    + "Transaction: " + type + "\n"
+                    + "Amount: Rs." + amount + "\n"
+                    + "Balance: Rs." + currentAccount.balance
+                    + "\n------------------------------";
+            JOptionPane.showMessageDialog(this, text);
+        }
+    }
+    String getAccountName() {
+        for (String key : currentCard.accounts.keySet()) {
+            if (currentCard.accounts.get(key) == currentAccount) {
+                return key;
+            }
+        }
+        return "";
+    }
+    void ejectCard() {
+        JOptionPane.showMessageDialog(this,"Thank you for banking with us!\n" + "Please take your card.");
+        currentCard = null;
+        currentAccount = null;
+        attempts = 0;
+        showLogin();
+    }
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new ATMSystem());
+    }
+}
